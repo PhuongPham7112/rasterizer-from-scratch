@@ -12,6 +12,7 @@ void triangleBarycentric(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor
 const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red   = TGAColor(255, 0,   0,   255);
 const TGAColor green = TGAColor(0,   255, 0,   255);
+Vec3f light_dir(0,0,-1); // define light_dir
 
 int main(int argc, char** argv) {
 	TGAImage image(500, 500, TGAImage::RGB);
@@ -23,12 +24,18 @@ int main(int argc, char** argv) {
 	for (int f = 0; f < model->nfaces(); f++) {
 		std::vector<int> face_vertices = model->face(f);
 		Vec2i screen_coords[3]; 
+		Vec3f world_coords[3];
 		// draw the triangle
 		for (int v = 0; v < 3; v++) {
-			Vec3f world_coords = model->vert(face_vertices[v]); 
-        	screen_coords[v] = Vec2i((world_coords.x+1.)*width/2., (world_coords.y+1.)*height/2.); 
+			Vec3f world_v = model->vert(face_vertices[v]); 
+			world_coords[v] = world_v;
+        	screen_coords[v] = Vec2i((world_v.x+1.)*width/2., (world_v.y+1.)*height/2.); 
 		}
-		triangleSweepLine(screen_coords[0], screen_coords[1], screen_coords[2], image, TGAColor(rand()%255, rand()%255, rand()%255, 255));
+		Vec3f normal = (world_coords[2] - world_coords[0]) ^ (world_coords[1] - world_coords[0]);
+		normal.normalize();
+		float intensity = normal * light_dir;
+		if (intensity > 0)
+			triangleSweepLine(screen_coords[0], screen_coords[1], screen_coords[2], image, TGAColor(255*intensity, 255*intensity, 255*intensity, intensity));
 	}
 
 	image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
