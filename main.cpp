@@ -86,7 +86,7 @@ glm::dvec3 barycentric(glm::dvec3 A, glm::dvec3 B, glm::dvec3 C, glm::dvec3 P) {
     }
 
     glm::dvec3 u = glm::cross(s[0], s[1]); // a vector (u,v,1) that is orthogonal to (ABx,ACx,PAx) and (ABy,ACy,PAy) at the same time
-    if (std::abs(u[2]) < 1.0) // dont forget that u[2] is integer. If it is zero then triangle ABC is degenerate
+    if (std::abs(u[2]) < 1e-3) // dont forget that u[2] is integer. If it is zero then triangle ABC is degenerate
         return glm::dvec3(-1.0, 1.0, 1.0); // in this case generate negative coordinates, it will be thrown away by the rasterizator
     return glm::dvec3(1.0 - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
 }
@@ -130,28 +130,29 @@ glm::dmat4 Viewport(double x, double y, double w, double h) {
     glm::dmat4 m = glm::dmat4(1.0);
     m[3][0] = x + w / 2.0;
     m[3][1] = y + h / 2.0;
-    m[3][2] = static_cast<double> (depth) / 2.0;
+    m[3][2] = static_cast<double>(depth) / 2.0;
 
     m[0][0] = w / 2.0;
     m[1][1] = h / 2.0;
-    m[2][2] = static_cast<double> (depth) / 2.0;
+    m[2][2] = static_cast<double>(depth) / 2.0;
     return m;
 }
 
 glm::dvec3 CameraProjectedCoords(glm::dvec3 v) {
     glm::dvec3 result;
     // camera projection
-    glm::dvec4 homo_coords (v.x, v.y, v.z, 1.0);
+    glm::dvec4 aug_coords (v.x, v.y, v.z, 1.0);
 
-    glm::dmat4 homo_mat (1.0);
-    homo_mat[2][3] = -1.0 / (camera.z);
+    glm::dmat4 proj_mat (1.0);
+    proj_mat[2][3] = -1.0 / (camera.z);
 
-    glm::dmat4 viewport_mat = Viewport(static_cast<double> (width) / 8.0, static_cast<double> (height) / 8.0, static_cast<double> (width) * 0.75, static_cast<double> (height) * 0.75);
-    glm::dvec4 proj_mat = viewport_mat * homo_mat * homo_coords;
+    glm::dmat4 viewport_mat = Viewport(static_cast<double>(width) / 8.0, static_cast<double>(height) / 8.0, static_cast<double>(width) * 0.75, static_cast<double>(height) * 0.75);
+    glm::dvec4 aug_mat = viewport_mat * proj_mat * aug_coords;
 
-    result.x = proj_mat[0] / proj_mat[3];
-    result.y = proj_mat[1] / proj_mat[3];
-    result.z = proj_mat[2] / proj_mat[3];
+    // make smoother result
+    result.x = int(aug_mat[0] / aug_mat[3]);
+    result.y = int(aug_mat[1] / aug_mat[3]);
+    result.z = aug_mat[2] / aug_mat[3];
 
     return result;
 }
@@ -186,7 +187,7 @@ int main(int argc, char** argv) {
         for (int j = 0; j < 3; j++) {
             texture_coords[j] = model->vert_texture(vertex_tex_idx[j]);
             world_coords[j] = model->vert(face[j]);
-            pts[j] = world2screen(world_coords[j]);
+            pts[j] = CameraProjectedCoords(world_coords[j]);
         }
         glm::dvec3 normal = glm::normalize(glm::cross(world_coords[1] - world_coords[0], world_coords[2] - world_coords[0]));
         double intensity = glm::dot(normal, light_dir);
