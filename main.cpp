@@ -75,6 +75,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <limits>
+#include <glm/glm.hpp>
 #include "tgaimage.h"
 #include "model.h"
 #include "geometry.h"
