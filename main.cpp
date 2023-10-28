@@ -84,6 +84,10 @@ const TGAColor red = TGAColor(255, 0, 0, 255);
 Model* model = NULL;
 const int width = 800;
 const int height = 800;
+const int depth = 255;
+
+Vec3f camera(0, 0, 3);
+Vec3f light_dir(0, 0, 1);
 
 // Bressanham's algorithm: https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) { 
@@ -167,15 +171,15 @@ void triangle(Vec3f* pts, Vec3f* texture_coords, float* zbuffer, TGAImage& image
         for (P.y = bboxmin.y; P.y <= bboxmax.y; P.y++) {
             Vec3f bc_screen = barycentric(pts[0], pts[1], pts[2], P);
             if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0) continue;
+            // calculate texture color
             Vec3f tex_coord = texture_coords[0] * bc_screen[0] + texture_coords[1] * bc_screen[1] + texture_coords[2] * bc_screen[2];
-            //std::cout << tex_coord << std::endl;
             TGAColor tex_color = tex_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
             tex_color.r *= intensity;
             tex_color.g *= intensity;
             tex_color.b *= intensity;
-            //std::cout << tex_color.r << " " << tex_color.g << " " << tex_color.b << std::endl;
+            // z depth buffer
             P.z = 0;
-            for (int i = 0; i < 3; i++) P.z += pts[i][2] * bc_screen[i];
+            for (int i = 0; i < 3; i++) P.z += pts[i].z * bc_screen[i];
             if (zbuffer[int(P.x + P.y * width)] < P.z) {
                 zbuffer[int(P.x + P.y * width)] = P.z;
                 image.set(P.x, P.y, tex_color);
@@ -186,6 +190,53 @@ void triangle(Vec3f* pts, Vec3f* texture_coords, float* zbuffer, TGAImage& image
 
 Vec3f world2screen(Vec3f v) {
     return Vec3f(int((v.x + 1.) * width / 2. + .5), int((v.y + 1.) * height / 2. + .5), v.z);
+}
+
+Matrix4x4 Viewport(int x, int y, int w, int h) {
+    Matrix4x4 m;
+    m.identity();
+    for (int i = 0; i < 4; i++) {
+        m[i][i] = 1.f;
+    }
+    m[0][3] = x + w / 2.f;
+    m[1][3] = y + h / 2.f;
+    m[2][3] = depth / 2.f;
+
+    m[0][0] = w / 2.f;
+    m[1][1] = h / 2.f;
+    m[2][2] = depth / 2.f;
+    return m;
+}
+
+Vec3f CameraProjectedCoords(Vec3f v) {
+    Vec3f result;
+    // camera projection
+    Matrix4x1 homo_coords;
+    homo_coords[0][0] = v.x;
+    homo_coords[1][0] = v.y;
+    homo_coords[2][0] = v.z;
+    homo_coords[3][0] = 1.f;
+
+    //std::cout << homo_coords << std::endl;
+
+    Matrix4x4 homo_mat;
+    homo_mat.identity();
+    for (int i = 0; i < 4; i++) {
+        homo_mat[i][i] = 1.f;
+    }
+    homo_mat[3][2] = -1.f / (camera.z);
+
+    //std::cout << homo_mat << std::endl;
+    Matrix4x4 viewport_mat = Viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
+    Matrix4x1 proj_mat = viewport_mat * homo_mat * homo_coords;
+    //std::cout << proj_mat << std::endl;
+
+    result.x = proj_mat[0][0] / proj_mat[3][0];
+    result.y = proj_mat[1][0] / proj_mat[3][0];
+    result.z = proj_mat[2][0] / proj_mat[3][0];
+
+    //std::cout << result << std::endl;
+    return result;
 }
 
 int main(int argc, char** argv) {
@@ -199,7 +250,6 @@ int main(int argc, char** argv) {
     float* zbuffer = new float[width * height];
     for (int i = width * height; i--; zbuffer[i] = -std::numeric_limits<float>::max());
 
-    Vec3f light_dir(0, 0, 1);
     TGAImage image(width, height, TGAImage::RGB);
     TGAImage textureImage; 
     textureImage.read_tga_file("african_head_diffuse.tga");
@@ -213,10 +263,9 @@ int main(int argc, char** argv) {
         Vec3f world_coords[3];
         Vec3f texture_coords[3];
         for (int j = 0; j < 3; j++) {
-            world_coords[j] = model->vert(face[j]);
-            //std::cout << "tex idx: " << vertex_tex_idx[j] << std::endl;
             texture_coords[j] = model->vert_texture(vertex_tex_idx[j]);
-            pts[j] = world2screen(world_coords[j]);
+            world_coords[j] = model->vert(face[j]);
+            pts[j] = CameraProjectedCoords(world_coords[j]);
         }
         Vec3f normal = cross((world_coords[1] - world_coords[0]), (world_coords[2] - world_coords[0]));
 		normal.normalize();
@@ -229,5 +278,6 @@ int main(int argc, char** argv) {
     image.flip_vertically();
     image.write_tga_file("output.tga");
     delete model;
+    delete[] zbuffer;
     return 0;
 }

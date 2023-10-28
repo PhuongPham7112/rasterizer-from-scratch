@@ -140,8 +140,11 @@ public:
 
     static mat<DimRows, DimCols, T> identity() {
         mat<DimRows, DimCols, T> ret;
-        for (size_t i = DimRows; i--; )
-            for (size_t j = DimCols; j--; ret[i][j] = (i == j));
+        for (size_t i = DimRows; i--; ) {
+            for (size_t j = DimCols; j--; ) {
+                ret[i][j] = (i == j ? 1.f : 0.f);
+            }
+        }
         return ret;
     }
 
@@ -216,5 +219,6 @@ typedef vec<2, int>   Vec2i;
 typedef vec<3, float> Vec3f;
 typedef vec<3, int>   Vec3i;
 typedef vec<4, float> Vec4f;
-typedef mat<4, 4, float> Matrix;
+typedef mat<4, 4, float> Matrix4x4;
+typedef mat<4, 1, float> Matrix4x1;
 #endif //__GEOMETRY_H__
