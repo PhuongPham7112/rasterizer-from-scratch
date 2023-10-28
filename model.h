@@ -3,13 +3,14 @@
 
 #include <vector>
 #include "geometry.h"
+#include <glm/glm.hpp>
 
 class Model {
 private:
-	std::vector<Vec3f> verts_;
+	std::vector<glm::dvec3> verts_;
 	std::vector<std::vector<int> > faces_;
 	std::vector<std::vector<int> > verts_texture_idx_;
-	std::vector<Vec3f> verts_texture_;
+	std::vector<glm::dvec3> verts_texture_;
 
 public:
 	Model(const char *filename);
@@ -17,8 +18,8 @@ public:
 	int nverts();
 	int nfaces();
 	int nvertTex();
-	Vec3f vert(int i);
-	Vec3f vert_texture(int i);
+	glm::dvec3 vert(int i);
+	glm::dvec3 vert_texture(int i);
 	std::vector<int> face(int idx);
 	std::vector<int> vert_texture_idx(int idx);
 };

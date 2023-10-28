@@ -20,7 +20,7 @@ Model::Model(const char *filename) : verts_(), faces_() {
         char trash;
         if (!line.compare(0, 2, vert_prefix)) {
             iss >> trash;
-            Vec3f v;
+            glm::dvec3 v;
             for (int i=0;i<3;i++) iss >> v[i];
             verts_.push_back(v);
         } else if (!line.compare(0, 2, face_prefix)) {
@@ -37,10 +37,9 @@ Model::Model(const char *filename) : verts_(), faces_() {
             faces_.push_back(f);
             verts_texture_idx_.push_back(vt);
         } else if (!line.compare(0, 4, vert_texture_prefix)) {
-            // vt = a list of vertex coordinates
             iss >> trash;
             iss >> trash;
-            Vec3f vt;
+            glm::dvec3 vt;
             for (int i = 0; i < 3; i++) iss >> vt[i];
             verts_texture_.push_back(vt);
         }
@@ -71,10 +70,10 @@ std::vector<int> Model::vert_texture_idx(int idx) {
     return verts_texture_idx_[idx];
 }
 
-Vec3f Model::vert(int i) {
+glm::dvec3 Model::vert(int i) {
     return verts_[i];
 }
 
-Vec3f Model::vert_texture(int i) {
+glm::dvec3 Model::vert_texture(int i) {
     return verts_texture_[i];
 }

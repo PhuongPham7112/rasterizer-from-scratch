@@ -1,7 +1,7 @@
 SYSCONF_LINK = g++
-CPPFLAGS     =
-LDFLAGS      =
-LIBS         = -lm
+CPPFLAGS     = -I./glm   # Add the glm library include directory
+LDFLAGS      =    # Add the glm library directory
+LIBS         = -lm  # Link with the glm library
 
 DESTDIR = ./
 TARGET  = main
