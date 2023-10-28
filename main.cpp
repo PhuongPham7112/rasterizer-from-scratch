@@ -203,6 +203,7 @@ int main(int argc, char** argv) {
     TGAImage image(width, height, TGAImage::RGB);
     TGAImage textureImage; 
     textureImage.read_tga_file("african_head_diffuse.tga");
+    textureImage.flip_vertically();
 
     // populate face
     for (int i = 0; i < model->nfaces(); i++) {
