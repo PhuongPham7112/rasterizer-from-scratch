@@ -55,7 +55,7 @@ glm::dvec3 barycentric(glm::dvec3 A, glm::dvec3 B, glm::dvec3 C, glm::dvec3 P) {
     return glm::dvec3(1.0 - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
 }
 
-void triangle(glm::dvec3* pts, glm::dvec3* texture_coords, double* zbuffer, TGAImage& image, TGAImage& tex_image, double intensity) {
+void triangle(glm::dvec3* pts, glm::dvec3* texture_coords, TGAImage& image, TGAImage& tex_image, double* zbuffer, double intensity) {
     glm::dvec2 bboxmin(std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
     glm::dvec2 bboxmax(std::numeric_limits<double>::min(), std::numeric_limits<double>::min());
     glm::dvec2 clamp(static_cast<double>(image.get_width() - 1), static_cast<double>(image.get_height() - 1));

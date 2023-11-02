@@ -15,6 +15,7 @@ const int depth = 255;
 
 glm::dvec3 camera(1, 0, 4);
 glm::dvec3 light_dir(0, 0, 1);
+glm::dvec3 cameraTarget(0, 0, 0);
 
 // printing
 void printDVec3(const glm::dvec3& vec) {
@@ -39,10 +40,20 @@ void printDMat4(const glm::dmat4& mat) {
     }
 }
 
+struct GouraudShader : public IShader {
+    glm::dvec3 varying_intensity;
+    virtual glm::ivec3 vertex(int iface, int nthvert) {
+        
+    }
+
+    virtual bool fragment(glm::vec3 baryCoord, TGAColor& color) {
+
+    }
+};
+
 glm::dvec3 RasterizedCoords(glm::dvec3 v) {
     glm::dvec3 result;
     glm::dvec4 aug_coords (v.x, v.y, v.z, 1.0);
-    glm::dvec3 cameraTarget = glm::dvec3(0, 0, 0);
     glm::dvec3 cameraEye = glm::normalize(cameraTarget - camera);
 
     projection(camera.z);
@@ -89,7 +100,7 @@ int main(int argc, char** argv) {
         glm::dvec3 normal = glm::normalize(glm::cross(world_coords[1] - world_coords[0], world_coords[2] - world_coords[0]));
         double intensity = glm::dot(normal, light_dir);
 		if (intensity > 0.0) {
-            triangle(pts, texture_coords, zbuffer, image, textureImage, intensity);
+            triangle(pts, texture_coords, image, textureImage, zbuffer, intensity);
 		}
     }
 
