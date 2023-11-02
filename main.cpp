@@ -12,7 +12,7 @@ const int width = 800;
 const int height = 800;
 const int depth = 255;
 
-glm::dvec3 camera(0, 0, 3);
+glm::dvec3 camera(0, 0, 4);
 glm::dvec3 light_dir(0, 0, 1);
 
 // printing
@@ -37,6 +37,8 @@ void printDMat4(const glm::dmat4& mat) {
         }
     }
 }
+
+
 
 // Bressanham's algorithm: https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) { 
@@ -126,6 +128,9 @@ void triangle(glm::dvec3* pts, glm::dvec3* texture_coords, double* zbuffer, TGAI
     }
 }
 
+// About viewport: http://learnwebgl.brown37.net/08_projections/projections_viewport.html
+// https://glasnost.itcarlow.ie/~powerk/GeneralGraphicsNotes/projection/viewport_transformation.html
+// affine transformation: https://en.wikipedia.org/wiki/Affine_transformation
 glm::dmat4 Viewport(double x, double y, double w, double h) {
     glm::dmat4 m = glm::dmat4(1.0);
     m[3][0] = x + w / 2.0;
@@ -138,6 +143,23 @@ glm::dmat4 Viewport(double x, double y, double w, double h) {
     return m;
 }
 
+glm::dmat4 LookAt(glm::dvec3 eye, glm::dvec3 center, glm::dvec3 up) {
+    glm::dvec3 forward = glm::normalize(center - eye);
+    glm::dvec3 right = glm::normalize(glm::cross(forward, up));
+    up = glm::normalize(glm::cross(forward, right));
+
+    glm::dmat4 M_inv = glm::dmat4(1.0);
+    glm::dmat4 Tr = glm::dmat4(1.0);
+
+    for (int i = 0; i < 3; i++) {
+        M_inv[i][0] = right[i];
+        M_inv[i][1] = up[i];
+        M_inv[i][2] = forward[i];
+        Tr[3][i] = -eye[i];
+    }
+    return M_inv * Tr;
+}
+
 glm::dvec3 CameraProjectedCoords(glm::dvec3 v) {
     glm::dvec3 result;
     // camera projection
@@ -147,7 +169,10 @@ glm::dvec3 CameraProjectedCoords(glm::dvec3 v) {
     proj_mat[2][3] = -1.0 / (camera.z);
 
     glm::dmat4 viewport_mat = Viewport(static_cast<double>(width) / 8.0, static_cast<double>(height) / 8.0, static_cast<double>(width) * 0.75, static_cast<double>(height) * 0.75);
-    glm::dvec4 aug_mat = viewport_mat * proj_mat * aug_coords;
+    glm::dvec3 cameraTarget = glm::dvec3(0, 0, 0);
+    glm::dvec3 cameraEye = glm::normalize(cameraTarget - camera);
+    glm::dmat4 modelview_mat = LookAt(cameraEye, camera, glm::dvec3(camera.x, -1, camera.z));
+    glm::dvec4 aug_mat = viewport_mat * proj_mat * modelview_mat * aug_coords;
 
     // make smoother result
     result.x = int(aug_mat[0] / aug_mat[3]);
