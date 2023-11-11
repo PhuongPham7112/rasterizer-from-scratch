@@ -55,7 +55,7 @@ glm::dvec3 barycentric(glm::dvec3 A, glm::dvec3 B, glm::dvec3 C, glm::dvec3 P) {
     return glm::dvec3(1.0 - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
 }
 
-void triangle(glm::dvec3* pts, glm::dvec3* texture_coords, TGAImage& image, TGAImage& tex_image, double* zbuffer, double intensity) {
+void triangle(glm::dvec3* pts, IShader& shader, TGAImage& image, TGAImage& tex_image, TGAImage& nm_image, double* zbuffer) {
     glm::dvec2 bboxmin(std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
     glm::dvec2 bboxmax(std::numeric_limits<double>::min(), std::numeric_limits<double>::min());
     glm::dvec2 clamp(static_cast<double>(image.get_width() - 1), static_cast<double>(image.get_height() - 1));
@@ -68,15 +68,13 @@ void triangle(glm::dvec3* pts, glm::dvec3* texture_coords, TGAImage& image, TGAI
     glm::dvec3 P;
     for (P.x = bboxmin.x; P.x <= bboxmax.x; P.x += 1.0) {
         for (P.y = bboxmin.y; P.y <= bboxmax.y; P.y += 1.0) {
+            // check if a point is in the triangle
             glm::dvec3 bc_screen = barycentric(pts[0], pts[1], pts[2], P);
             if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0) continue;
+
             // calculate texture color
-            glm::dvec3 tex_coord = texture_coords[0] * bc_screen[0] + texture_coords[1] * bc_screen[1] + texture_coords[2] * bc_screen[2];
-            TGAColor tex_color = tex_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
-            tex_color.r *= static_cast<float>(intensity);
-            tex_color.g *= static_cast<float>(intensity);
-            tex_color.b *= static_cast<float>(intensity);
-            tex_color.a = 255;
+            TGAColor tex_color;
+            shader.fragment(bc_screen, tex_image, nm_image, tex_color);
 
             // hidden face removal
             P.z = 0.0;

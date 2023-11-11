@@ -42,32 +42,44 @@ void printDMat4(const glm::dmat4& mat) {
 
 struct GouraudShader : public IShader {
     glm::dvec3 varying_intensity;
-    virtual glm::ivec3 vertex(int iface, int nthvert) {
+    glm::dvec3 varying_uvCoords[3];
+    glm::dmat4 uniform_M;
+    glm::dmat4 uniform_invM;
+    virtual glm::dvec3 vertex(int iface, int nthvert) override {
+        glm::dvec3 n = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(model->normal(iface), 0.0)));
+        glm::dvec3 l = glm::normalize(glm::dvec3(uniform_M * glm::dvec4(light_dir, 1.0)));
         
+        varying_intensity[nthvert] = std::max(0.0, glm::dot(n, l));
+        varying_uvCoords[nthvert] = model->vert_texture(model->vert_texture_idx(iface)[nthvert]);
+        
+        // rasterize
+        glm::dvec3 v = model->vert(model->face(iface)[nthvert]);
+        glm::dvec4 aug_coords(v.x, v.y, v.z, 1.0);
+        glm::dvec4 aug_mat = Viewport_mat * Projection_mat * ModelView_mat * aug_coords;
+
+        // make smoother result
+        glm::dvec3 result;
+        result.x = int(aug_mat[0] / aug_mat[3]);
+        result.y = int(aug_mat[1] / aug_mat[3]);
+        result.z = aug_mat[2] / aug_mat[3];
+        return result;
     }
 
-    virtual bool fragment(glm::vec3 baryCoord, TGAColor& color) {
-
+    virtual bool fragment(glm::dvec3 baryCoord, TGAImage& tex_image, TGAImage& nm_image, TGAColor& color) override {
+        float intensity = glm::dot(baryCoord, varying_intensity);
+        glm::dvec3 tex_coord = varying_uvCoords[0] * baryCoord[0] + varying_uvCoords[1] * baryCoord[1] + varying_uvCoords[2] * baryCoord[2];
+        TGAColor tex_color = tex_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
+        TGAColor nm_color = nm_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
+        glm::dvec3 normal_color = glm::normalize(glm::dvec3(nm_color[0], nm_color[1], nm_color[2]) * 2.0 - 1.0);
+        double final_normal = glm::max(glm::dot(normal_color, glm::dvec3(0.0, 0.0, 1.0)), 0.0);
+        //TGAColor combined_color = TGAColor(glm::clamp(tex_color[0] * final_normal, 0, 255),
+        //    glm::clamp(tex_color[1] + nm_color[1], 0, 255), 
+        //    glm::clamp(tex_color[2] + nm_color[2], 0, 255), 
+        //    glm::clamp(tex_color[3] + nm_color[3], 0, 255));
+        color = tex_color * final_normal * intensity;
+        return false;
     }
 };
-
-glm::dvec3 RasterizedCoords(glm::dvec3 v) {
-    glm::dvec3 result;
-    glm::dvec4 aug_coords (v.x, v.y, v.z, 1.0);
-    glm::dvec3 cameraEye = glm::normalize(cameraTarget - camera);
-
-    projection(camera.z);
-    viewport(static_cast<double>(width) / 8.0, static_cast<double>(height) / 8.0, static_cast<double>(width) * 0.75, static_cast<double>(height) * 0.75, depth);
-    lookAt(cameraEye, camera, glm::dvec3(camera.x, -1, camera.z));
-    glm::dvec4 aug_mat = Viewport_mat * Projection_mat * ModelView_mat * aug_coords;
-
-    // make smoother result
-    result.x = int(aug_mat[0] / aug_mat[3]);
-    result.y = int(aug_mat[1] / aug_mat[3]);
-    result.z = aug_mat[2] / aug_mat[3];
-
-    return result;
-}
 
 int main(int argc, char** argv) {
     if (2 == argc) {
@@ -85,23 +97,27 @@ int main(int argc, char** argv) {
     textureImage.read_tga_file("african_head_diffuse.tga");
     textureImage.flip_vertically();
 
+    TGAImage normalImage;
+    normalImage.read_tga_file("african_head_nm_tangent.tga");
+    normalImage.flip_vertically();
+
+    // all transformation matrices
+    glm::dvec3 cameraEye = glm::normalize(cameraTarget - camera);
+    projection(camera.z);
+    viewport(static_cast<double>(width) / 8.0, static_cast<double>(height) / 8.0, static_cast<double>(width) * 0.75, static_cast<double>(height) * 0.75, depth);
+    lookAt(cameraEye, camera, glm::dvec3(camera.x, -1, camera.z));
+
     // populate face
+    GouraudShader shader;
+    shader.uniform_M = Projection_mat * ModelView_mat;
+    shader.uniform_invM = glm::inverse(shader.uniform_M);
+
     for (int i = 0; i < model->nfaces(); i++) {
-        std::vector<int> face = model->face(i);
-        std::vector<int> vertex_tex_idx = model->vert_texture_idx(i);
         glm::dvec3 pts[3];
-        glm::dvec3 world_coords[3];
-        glm::dvec3 texture_coords[3];
         for (int j = 0; j < 3; j++) {
-            texture_coords[j] = model->vert_texture(vertex_tex_idx[j]);
-            world_coords[j] = model->vert(face[j]);
-            pts[j] = RasterizedCoords(world_coords[j]);
+            pts[j] = shader.vertex(i, j);
         }
-        glm::dvec3 normal = glm::normalize(glm::cross(world_coords[1] - world_coords[0], world_coords[2] - world_coords[0]));
-        double intensity = glm::dot(normal, light_dir);
-		if (intensity > 0.0) {
-            triangle(pts, texture_coords, image, textureImage, zbuffer, intensity);
-		}
+        triangle(pts, shader, image, textureImage, normalImage, zbuffer);
     }
 
     image.flip_vertically();

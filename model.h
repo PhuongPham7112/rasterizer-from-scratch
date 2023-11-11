@@ -20,6 +20,7 @@ public:
 	int nvertTex();
 	glm::dvec3 vert(int i);
 	glm::dvec3 vert_texture(int i);
+	glm::dvec3 normal(int iface);
 	std::vector<int> face(int idx);
 	std::vector<int> vert_texture_idx(int idx);
 };

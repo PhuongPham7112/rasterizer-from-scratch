@@ -62,12 +62,22 @@ int Model::nvertTex() {
     return (int)verts_texture_.size();
 }
 
+// list of index to vertices making up this face idx
 std::vector<int> Model::face(int idx) {
     return faces_[idx];
 }
 
 std::vector<int> Model::vert_texture_idx(int idx) {
     return verts_texture_idx_[idx];
+}
+
+glm::dvec3 Model::normal(int iface) {
+    std::vector<int> face = this->face(iface);
+    glm::dvec3 world_coords[3];
+    for (int j = 0; j < 3; j++) {
+        world_coords[j] = this->vert(face[j]);
+    }
+    return glm::normalize(glm::cross(world_coords[1] - world_coords[0], world_coords[2] - world_coords[0]));
 }
 
 glm::dvec3 Model::vert(int i) {
