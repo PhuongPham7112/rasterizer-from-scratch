@@ -1,6 +1,9 @@
 #include "tgaimage.h"
 #include <glm/glm.hpp>
 
+extern double ks = 0.6; // specular const
+extern double kd = 1.0; // diffuse const
+extern double ka = 3.0; // ambient const
 extern glm::dmat4 ModelView_mat;
 extern glm::dmat4 Projection_mat;
 extern glm::dmat4 Viewport_mat;

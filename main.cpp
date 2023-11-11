@@ -66,17 +66,27 @@ struct GouraudShader : public IShader {
     }
 
     virtual bool fragment(glm::dvec3 baryCoord, TGAImage& tex_image, TGAImage& nm_image, TGAColor& color) override {
-        float intensity = glm::dot(baryCoord, varying_intensity);
+
+        // albedo
         glm::dvec3 tex_coord = varying_uvCoords[0] * baryCoord[0] + varying_uvCoords[1] * baryCoord[1] + varying_uvCoords[2] * baryCoord[2];
         TGAColor tex_color = tex_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
+
+        // normal
         TGAColor nm_color = nm_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
         glm::dvec3 normal_color = glm::normalize(glm::dvec3(nm_color[0], nm_color[1], nm_color[2]) * 2.0 - 1.0);
-        double final_normal = glm::max(glm::dot(normal_color, glm::dvec3(0.0, 0.0, 1.0)), 0.0);
-        //TGAColor combined_color = TGAColor(glm::clamp(tex_color[0] * final_normal, 0, 255),
-        //    glm::clamp(tex_color[1] + nm_color[1], 0, 255), 
-        //    glm::clamp(tex_color[2] + nm_color[2], 0, 255), 
-        //    glm::clamp(tex_color[3] + nm_color[3], 0, 255));
-        color = tex_color * final_normal * intensity;
+        double normal_coeff = glm::max(glm::dot(normal_color, glm::dvec3(0.0, 0.0, 1.0)), 0.0);
+
+        // diffuse color
+        
+
+        // final color
+        float intensity = (glm::dot(baryCoord, varying_intensity) + ka);
+        color = tex_color * normal_coeff * intensity;
+
+        // clamp each color
+        for (int i = 0; i < 3; i++) {
+            color[i] = std::min<double>(color[i], 255.0);
+        }
         return false;
     }
 };
