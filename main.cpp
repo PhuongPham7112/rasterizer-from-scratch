@@ -42,6 +42,8 @@ void printDMat4(const glm::dmat4& mat) {
 
 struct GouraudShader : public IShader {
     glm::dvec3 varying_intensity;
+    glm::dvec3 varying_reflection;
+    glm::dvec3 varying_view;
     glm::dvec3 varying_uvCoords[3];
     glm::dmat4 uniform_M;
     glm::dmat4 uniform_invM;
@@ -54,6 +56,7 @@ struct GouraudShader : public IShader {
         glm::dvec3 n = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(model->normal(iface), 0.0)));
         glm::dvec3 l = glm::normalize(glm::dvec3(uniform_M * glm::dvec4(light_dir, 1.0)));
         
+        varying_reflection = glm::normalize(2.0 * glm::dot(l, n) * n - l);
         varying_intensity[nthvert] = std::max(0.0, glm::dot(n, l));
         varying_uvCoords[nthvert] = model->vert_texture(model->vert_texture_idx(iface)[nthvert]);
         
@@ -67,12 +70,14 @@ struct GouraudShader : public IShader {
         result.x = int(aug_mat[0] / aug_mat[3]);
         result.y = int(aug_mat[1] / aug_mat[3]);
         result.z = aug_mat[2] / aug_mat[3];
+
+        varying_view = glm::normalize(camera - v);
         return result;
     }
 
     virtual bool fragment(glm::dvec3 baryCoord, TGAImage& tex_image, TGAImage& nm_image, TGAImage& spec_image, TGAColor& color) override {
 
-        // albedo
+        // diffuse
         glm::dvec3 tex_coord = varying_uvCoords[0] * baryCoord[0] + varying_uvCoords[1] * baryCoord[1] + varying_uvCoords[2] * baryCoord[2];
         TGAColor tex_color = tex_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
 
@@ -81,11 +86,13 @@ struct GouraudShader : public IShader {
         glm::dvec3 normal_color = glm::normalize(glm::dvec3(nm_color[0], nm_color[1], nm_color[2]) * 2.0 - 1.0);
         double normal_coeff = glm::max(glm::dot(normal_color, glm::dvec3(0.0, 0.0, 1.0)), 0.0);
 
-        // diffuse color
-        
+        // specular
+        TGAColor spec_color = spec_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
+        double spec_intensity = glm::pow(varying_reflection.z, spec_color[0]);
 
         // final color
-        float intensity = (glm::dot(baryCoord, varying_intensity) + ka);
+        double ambient_intensity = 1.5;
+        double intensity = (kd * glm::dot(baryCoord, varying_intensity) + ks * spec_intensity + ka * ambient_intensity);
         color = tex_color * normal_coeff * intensity;
 
         // clamp each color
