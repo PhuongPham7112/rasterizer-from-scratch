@@ -13,7 +13,7 @@ const int width = 800;
 const int height = 800;
 const int depth = 255;
 
-glm::dvec3 camera(1, 0, 4);
+glm::dvec3 camera(0, 0, 4);
 glm::dvec3 light_dir(0, 0, 1);
 glm::dvec3 cameraTarget(0, 0, 0);
 
@@ -45,6 +45,11 @@ struct GouraudShader : public IShader {
     glm::dvec3 varying_uvCoords[3];
     glm::dmat4 uniform_M;
     glm::dmat4 uniform_invM;
+
+    double ks = 0.6;
+    double ka = 5.0;
+    double kd = 1.0;
+
     virtual glm::dvec3 vertex(int iface, int nthvert) override {
         glm::dvec3 n = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(model->normal(iface), 0.0)));
         glm::dvec3 l = glm::normalize(glm::dvec3(uniform_M * glm::dvec4(light_dir, 1.0)));
@@ -65,7 +70,7 @@ struct GouraudShader : public IShader {
         return result;
     }
 
-    virtual bool fragment(glm::dvec3 baryCoord, TGAImage& tex_image, TGAImage& nm_image, TGAColor& color) override {
+    virtual bool fragment(glm::dvec3 baryCoord, TGAImage& tex_image, TGAImage& nm_image, TGAImage& spec_image, TGAColor& color) override {
 
         // albedo
         glm::dvec3 tex_coord = varying_uvCoords[0] * baryCoord[0] + varying_uvCoords[1] * baryCoord[1] + varying_uvCoords[2] * baryCoord[2];
@@ -111,6 +116,10 @@ int main(int argc, char** argv) {
     normalImage.read_tga_file("african_head_nm_tangent.tga");
     normalImage.flip_vertically();
 
+    TGAImage specImage;
+    specImage.read_tga_file("african_head_SSS.tga");
+    specImage.flip_vertically();
+
     // all transformation matrices
     glm::dvec3 cameraEye = glm::normalize(cameraTarget - camera);
     projection(camera.z);
@@ -127,7 +136,7 @@ int main(int argc, char** argv) {
         for (int j = 0; j < 3; j++) {
             pts[j] = shader.vertex(i, j);
         }
-        triangle(pts, shader, image, textureImage, normalImage, zbuffer);
+        triangle(pts, shader, image, textureImage, normalImage, specImage, zbuffer);
     }
 
     image.flip_vertically();
