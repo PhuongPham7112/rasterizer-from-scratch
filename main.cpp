@@ -14,7 +14,7 @@ const int height = 800;
 const int depth = 255;
 
 glm::dvec3 camera(0, 0, 4);
-glm::dvec3 light_dir(0, 0, 1);
+glm::dvec3 light_dir(1, 1, 1);
 glm::dvec3 cameraTarget(0, 0, 0);
 
 // printing
@@ -41,23 +41,16 @@ void printDMat4(const glm::dmat4& mat) {
 }
 
 struct GouraudShader : public IShader {
-    glm::dvec3 varying_intensity;
-    glm::dvec3 varying_reflection;
     glm::dvec3 varying_view;
     glm::dvec3 varying_uvCoords[3];
     glm::dmat4 uniform_M;
     glm::dmat4 uniform_invM;
 
-    double ks = 0.6;
-    double ka = 5.0;
+    double ks = 5.0;
+    double ka = 1.0;
     double kd = 1.0;
 
     virtual glm::dvec3 vertex(int iface, int nthvert) override {
-        glm::dvec3 n = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(model->normal(iface), 0.0)));
-        glm::dvec3 l = glm::normalize(glm::dvec3(uniform_M * glm::dvec4(light_dir, 1.0)));
-        
-        varying_reflection = glm::normalize(2.0 * glm::dot(l, n) * n - l);
-        varying_intensity[nthvert] = std::max(0.0, glm::dot(n, l));
         varying_uvCoords[nthvert] = model->vert_texture(model->vert_texture_idx(iface)[nthvert]);
         
         // rasterize
@@ -71,33 +64,38 @@ struct GouraudShader : public IShader {
         result.y = int(aug_mat[1] / aug_mat[3]);
         result.z = aug_mat[2] / aug_mat[3];
 
-        varying_view = glm::normalize(camera - v);
+        varying_view = glm::normalize(v - camera);
         return result;
     }
 
     virtual bool fragment(glm::dvec3 baryCoord, TGAImage& tex_image, TGAImage& nm_image, TGAImage& spec_image, TGAColor& color) override {
-
-        // diffuse
         glm::dvec3 tex_coord = varying_uvCoords[0] * baryCoord[0] + varying_uvCoords[1] * baryCoord[1] + varying_uvCoords[2] * baryCoord[2];
-        TGAColor tex_color = tex_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
 
         // normal
-        TGAColor nm_color = nm_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
-        glm::dvec3 normal_color = glm::normalize(glm::dvec3(nm_color[0], nm_color[1], nm_color[2]) * 2.0 - 1.0);
-        double normal_coeff = glm::max(glm::dot(normal_color, glm::dvec3(0.0, 0.0, 1.0)), 0.0);
+        TGAColor nm_color = nm_image.get((int)(tex_coord[0] * nm_image.get_width()), (int)(tex_coord[1] * nm_image.get_height()));
+        glm::dvec3 norm = glm::normalize(glm::dvec3(nm_color[0], nm_color[1], nm_color[2]) * 2.0 - 1.0);
+
+        glm::dvec3 n = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(norm, 0.0)));
+        glm::dvec3 l = glm::normalize(glm::dvec3(uniform_M * glm::dvec4(light_dir, 1.0)));
+        
+        // diffuse
+        TGAColor tex_color = tex_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
+        double diffuse_intensity = std::max(0.0, glm::dot(n, l));
+
 
         // specular
-        TGAColor spec_color = spec_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
-        double spec_intensity = glm::pow(varying_reflection.z, spec_color[0]);
+        glm::dvec3 reflection = glm::normalize(2.0 * glm::dot(l, n) * n - l);
+        TGAColor spec_color = spec_image.get((int)(tex_coord[0] * spec_image.get_width()), (int)(tex_coord[1] * spec_image.get_height()));
+        double spec_intensity = glm::pow(glm::max(glm::dot(reflection, varying_view), 0.0), spec_color[0]);
+        //std::cout << spec_intensity << " " << (double) spec_color[0] << " " << glm::dot(reflection, varying_view) << std::endl;
 
         // final color
-        double ambient_intensity = 1.5;
-        double intensity = (kd * glm::dot(baryCoord, varying_intensity) + ks * spec_intensity + ka * ambient_intensity);
-        color = tex_color * normal_coeff * intensity;
+        double ambient_intensity = 1.0;
+        color = tex_color;
 
         // clamp each color
         for (int i = 0; i < 3; i++) {
-            color[i] = std::min<double>(color[i], 255.0);
+            color[i] = std::min<double>(ka * ambient_intensity + tex_color[i] * (kd * diffuse_intensity + ks * spec_intensity), 255.0);
         }
         return false;
     }
@@ -124,7 +122,7 @@ int main(int argc, char** argv) {
     normalImage.flip_vertically();
 
     TGAImage specImage;
-    specImage.read_tga_file("african_head_SSS.tga");
+    specImage.read_tga_file("african_head_spec.tga");
     specImage.flip_vertically();
 
     // all transformation matrices
