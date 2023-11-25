@@ -13,8 +13,8 @@ const int width = 800;
 const int height = 800;
 const int depth = 255;
 
-glm::dvec3 camera(0, 0, 4);
-glm::dvec3 light_dir(-1, 0, 1);
+glm::dvec3 camera(2, 2, 5);
+glm::dvec3 light_dir(0, 0, 1);
 glm::dvec3 cameraTarget(0, 0, 0);
 
 // printing
@@ -43,12 +43,13 @@ void printDMat4(const glm::dmat4& mat) {
 struct GouraudShader : public IShader {
     glm::dvec3 varying_view;
     glm::dvec3 varying_uvCoords[3];
+    glm::dvec3 varying_fragPos[3];
     glm::dmat4 uniform_M;
     glm::dmat4 uniform_invM;
 
-    double ks = 1.5;
-    double ka = 5.0;
-    double kd = 0.5;
+    double ks = 1.0;
+    double ka = 0.0;
+    double kd = 0.0;
 
     virtual glm::dvec3 vertex(int iface, int nthvert) override {
         varying_uvCoords[nthvert] = model->vert_texture(model->vert_texture_idx(iface)[nthvert]);
@@ -64,30 +65,35 @@ struct GouraudShader : public IShader {
         result.y = int(aug_mat[1] / aug_mat[3]);
         result.z = aug_mat[2] / aug_mat[3];
 
-        varying_view = glm::normalize(v - camera);
+        // variables
+        varying_fragPos[nthvert] = result;
+        varying_view = glm::normalize(camera - varying_fragPos[nthvert]);
         return result;
     }
 
+    // TODO: refractor
     virtual bool fragment(glm::dvec3 baryCoord, TGAImage& tex_image, TGAImage& nm_image, TGAImage& spec_image, TGAColor& color) override {
         glm::dvec3 tex_coord = varying_uvCoords[0] * baryCoord[0] + varying_uvCoords[1] * baryCoord[1] + varying_uvCoords[2] * baryCoord[2];
 
         // normal
         TGAColor nm_color = nm_image.get((int)(tex_coord[0] * nm_image.get_width()), (int)(tex_coord[1] * nm_image.get_height()));
-        glm::dvec3 norm = glm::normalize(glm::dvec3(nm_color[0], nm_color[1], nm_color[2]) * 2.0 - 1.0);
+        glm::dvec3 norm;
+        for (int i = 2; i > 0; i--) {
+            norm[2 - i] = (double)nm_color[i] / 255.0 * 2.0 - 1.0;
+        }
 
+        // normal and light vector
         glm::dvec3 n = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(norm, 0.0)));
-        glm::dvec3 l = glm::normalize(glm::dvec3(uniform_M * glm::dvec4(light_dir, 1.0)));
+        glm::dvec3 l = glm::normalize(glm::dvec3(uniform_M * glm::dvec4(light_dir, 0.0)));
         
         // diffuse
         TGAColor tex_color = tex_image.get((int)(tex_coord[0] * tex_image.get_width()), (int)(tex_coord[1] * tex_image.get_height()));
         double diffuse_intensity = std::max(0.0, glm::dot(n, l));
 
-
         // specular
-        glm::dvec3 reflection = (2.0 * glm::dot(l, n) * n - l);
+        glm::dvec3 reflection = glm::normalize(glm::reflect(l, n));
         TGAColor spec_color = spec_image.get((int)(tex_coord[0] * spec_image.get_width()), (int)(tex_coord[1] * spec_image.get_height()));
-        double spec_intensity = glm::pow(glm::max(glm::dot(reflection, varying_view), 0.0), spec_color[0]);
-        //std::cout << spec_intensity << " " << (double) spec_color[0] << " " << glm::dot(reflection, varying_view) << std::endl;
+        double spec_intensity = glm::pow(glm::max(glm::dot(reflection, varying_view), 0.0), 1.0 - (double)spec_color[0] / 255.0);
 
         // final color
         double ambient_intensity = 1.0;
@@ -114,22 +120,22 @@ int main(int argc, char** argv) {
 
     TGAImage image(width, height, TGAImage::RGB);
     TGAImage textureImage; 
-    textureImage.read_tga_file("african_head_diffuse.tga");
+    textureImage.read_tga_file("obj/african_head_diffuse.tga");
     textureImage.flip_vertically();
 
     TGAImage normalImage;
-    normalImage.read_tga_file("african_head_nm_tangent.tga");
+    normalImage.read_tga_file("obj/african_head_nm_tangent.tga");
     normalImage.flip_vertically();
 
     TGAImage specImage;
-    specImage.read_tga_file("african_head_spec.tga");
+    specImage.read_tga_file("obj/african_head_spec.tga");
     specImage.flip_vertically();
 
     // all transformation matrices
     glm::dvec3 cameraEye = glm::normalize(cameraTarget - camera);
     projection(camera.z);
     viewport(static_cast<double>(width) / 8.0, static_cast<double>(height) / 8.0, static_cast<double>(width) * 0.75, static_cast<double>(height) * 0.75, depth);
-    lookAt(cameraEye, camera, glm::dvec3(camera.x, -1, camera.z));
+    lookAt(cameraEye, camera, glm::dvec3(0.0, -1, 0.0));
 
     // populate face
     GouraudShader shader;
