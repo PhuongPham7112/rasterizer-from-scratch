@@ -47,7 +47,7 @@ struct GouraudShader : public IShader {
     glm::dmat4 uniform_M;
     glm::dmat4 uniform_invM;
 
-    double ks = 0.3;
+    double ks = 0.4;
     double ka = 0.1;
     double kd = 0.6;
 
