@@ -13,7 +13,7 @@ const int width = 800;
 const int height = 800;
 const int depth = 255;
 
-glm::dvec3 camera(2, 2, 5);
+glm::dvec3 camera(0, 0, 5);
 glm::dvec3 light_dir(0, 0, 1);
 glm::dvec3 cameraTarget(0, 0, 0);
 
@@ -47,9 +47,9 @@ struct GouraudShader : public IShader {
     glm::dmat4 uniform_M;
     glm::dmat4 uniform_invM;
 
-    double ks = 1.0;
+    double ks = 0.5;
     double ka = 0.0;
-    double kd = 0.0;
+    double kd = 1.0;
 
     virtual glm::dvec3 vertex(int iface, int nthvert) override {
         varying_uvCoords[nthvert] = model->vert_texture(model->vert_texture_idx(iface)[nthvert]);
@@ -91,9 +91,12 @@ struct GouraudShader : public IShader {
         double diffuse_intensity = std::max(0.0, glm::dot(n, l));
 
         // specular
-        glm::dvec3 reflection = glm::normalize(glm::reflect(l, n));
+        
+        glm::dvec3 reflection = glm::reflect(l, n);
         TGAColor spec_color = spec_image.get((int)(tex_coord[0] * spec_image.get_width()), (int)(tex_coord[1] * spec_image.get_height()));
-        double spec_intensity = glm::pow(glm::max(glm::dot(reflection, varying_view), 0.0), 1.0 - (double)spec_color[0] / 255.0);
+        double cos_angle = glm::clamp(glm::dot(reflection, varying_view), 0.0, 1.0);
+        double gloss = glm::exp2(glm::clamp((double)spec_color[0], 0.0, 1.0) * 6.0) + 2.0;
+        double spec_intensity = glm::pow(cos_angle, glm::clamp((double)spec_color[0], 0.0, 1.0));
 
         // final color
         double ambient_intensity = 1.0;
