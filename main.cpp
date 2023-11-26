@@ -47,9 +47,9 @@ struct GouraudShader : public IShader {
     glm::dmat4 uniform_M;
     glm::dmat4 uniform_invM;
 
-    double ks = 0.5;
-    double ka = 0.0;
-    double kd = 1.0;
+    double ks = 0.3;
+    double ka = 0.1;
+    double kd = 0.6;
 
     virtual glm::dvec3 vertex(int iface, int nthvert) override {
         varying_uvCoords[nthvert] = model->vert_texture(model->vert_texture_idx(iface)[nthvert]);
@@ -104,7 +104,7 @@ struct GouraudShader : public IShader {
 
         // clamp each color
         for (int i = 0; i < 3; i++) {
-            color[i] = std::min<double>(ka * ambient_intensity + tex_color[i] * (kd * diffuse_intensity + ks * spec_intensity), 255.0);
+            color[i] = std::min<double>(tex_color[i] * (ka * ambient_intensity + kd * diffuse_intensity + ks * spec_intensity), 255.0);
         }
         return false;
     }
