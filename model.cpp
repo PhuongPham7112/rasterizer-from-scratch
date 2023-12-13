@@ -43,8 +43,14 @@ Model::Model(const char *filename) : verts_(), faces_() {
             for (int i = 0; i < 3; i++) iss >> vt[i];
             verts_texture_.push_back(vt);
         }
+        else if (!line.compare(0, 3, "vn ")) {
+            iss >> trash >> trash;
+            glm::dvec3 n;
+            for (int i = 0; i < 3; i++) iss >> n[i];
+            norms_.push_back(n);
+        }
     }
-    std::cerr << "# v# " << verts_.size() << " #vt " << verts_texture_.size() << " vertex texture idx " << verts_texture_idx_.size() << " f# " << faces_.size() << std::endl;
+    std::cerr << "# v# " << verts_.size() << " #vt " << verts_texture_.size() << " vertex texture idx " << verts_texture_idx_.size() << " f# " << faces_.size() << " vn# " << norms_.size() << std::endl;
 }
 
 Model::~Model() {
@@ -87,3 +93,4 @@ glm::dvec3 Model::vert(int i) {
 glm::dvec3 Model::vert_texture(int i) {
     return verts_texture_[i];
 }
+

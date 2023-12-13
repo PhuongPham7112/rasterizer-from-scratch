@@ -8,6 +8,7 @@
 class Model {
 private:
 	std::vector<glm::dvec3> verts_;
+	std::vector<glm::dvec3> norms_;
 	std::vector<std::vector<int> > faces_;
 	std::vector<std::vector<int> > verts_texture_idx_;
 	std::vector<glm::dvec3> verts_texture_;
