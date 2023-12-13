@@ -48,9 +48,9 @@ struct GouraudShader : public IShader {
     glm::dmat4 uniform_M;
     glm::dmat4 uniform_invM;
 
-    double ks = 1.8;
-    double ka = 0.0;
-    double kd = 0.8;
+    double ks = 0.4;
+    double ka = 0.1;
+    double kd = 0.6;
 
     virtual glm::dvec3 vertex(int iface, int nthvert) override {
         varying_iface = iface;
@@ -84,7 +84,7 @@ struct GouraudShader : public IShader {
 
         // normal and light vector
         glm::dvec3 l = glm::normalize(glm::dvec3(uniform_M * glm::dvec4(light_dir, 0.0)));
-        glm::dvec3 n = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(model->normal(varying_iface), 0.0)));
+        glm::dvec3 n = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(norm, 0.0)));
         
         // diffuse
         TGAColor tex_color = tex_image.get((int)(uv[0] * tex_image.get_width()), (int)(uv[1] * tex_image.get_height()));
@@ -94,9 +94,7 @@ struct GouraudShader : public IShader {
         TGAColor spec_color = spec_image.get((int)(uv[0] * spec_image.get_width()), (int)(uv[1] * spec_image.get_height()));
         glm::dvec3 reflection = glm::normalize(glm::reflect(l, n));
         double cos_angle = glm::max(glm::dot(reflection, varying_view), 0.0);
-        //std::cout << cos_angle << " ^ " << spec_color[0] / 1.0 << std::endl;
         double spec_intensity = glm::pow(cos_angle, 5.0 + spec_color[0]/1.0);
-        //std::cout << spec_intensity << std::endl;
 
         // final color
         double ambient_intensity = 1.0;
@@ -129,7 +127,7 @@ int main(int argc, char** argv) {
     textureImage.flip_vertically();
 
     TGAImage normalImage;
-    normalImage.read_tga_file("obj/african_head_nm_tangent.tga");
+    normalImage.read_tga_file("obj/african_head_nm.tga");
     normalImage.flip_vertically();
 
     TGAImage specImage;

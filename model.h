@@ -22,6 +22,7 @@ public:
 	glm::dvec3 vert(int i);
 	glm::dvec3 vert_texture(int i);
 	glm::dvec3 normal(int iface);
+	//glm::dvec3 Model::normal(int iface, int nthvert);
 	std::vector<int> face(int idx);
 	std::vector<int> vert_texture_idx(int idx);
 };

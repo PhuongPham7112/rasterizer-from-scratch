@@ -86,6 +86,11 @@ glm::dvec3 Model::normal(int iface) {
     return glm::normalize(glm::cross(world_coords[1] - world_coords[0], world_coords[2] - world_coords[0]));
 }
 
+//glm::dvec3 Model::normal(int iface, int nthvert) {
+//    int idx = faces_[iface][nthvert][2];
+//    return norms_[idx].normalize();
+//}
+
 glm::dvec3 Model::vert(int i) {
     return verts_[i];
 }
