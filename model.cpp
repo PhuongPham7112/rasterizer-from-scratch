@@ -8,6 +8,8 @@
 const char vert_prefix[3] = "v ";
 const char face_prefix[3] = "f ";
 const char vert_texture_prefix[5] = "vt  ";
+const char normal_prefix[5] = "vn ";
+
 
 Model::Model(const char *filename) : verts_(), faces_() {
     std::ifstream in;
@@ -43,7 +45,7 @@ Model::Model(const char *filename) : verts_(), faces_() {
             for (int i = 0; i < 3; i++) iss >> vt[i];
             verts_texture_.push_back(vt);
         }
-        else if (!line.compare(0, 3, "vn ")) {
+        else if (!line.compare(0, 3, normal_prefix)) {
             iss >> trash >> trash;
             glm::dvec3 n;
             for (int i = 0; i < 3; i++) iss >> n[i];
@@ -86,10 +88,10 @@ glm::dvec3 Model::normal(int iface) {
     return glm::normalize(glm::cross(world_coords[1] - world_coords[0], world_coords[2] - world_coords[0]));
 }
 
-//glm::dvec3 Model::normal(int iface, int nthvert) {
-//    int idx = faces_[iface][nthvert][2];
-//    return norms_[idx].normalize();
-//}
+glm::dvec3 Model::normal(int iface, int nthvert) {
+    int idx = faces_[iface][nthvert];
+    return glm::normalize(norms_[idx]);
+}
 
 glm::dvec3 Model::vert(int i) {
     return verts_[i];

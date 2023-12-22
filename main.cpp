@@ -5,6 +5,7 @@
 #include "our_gl.h"
 #include "tgaimage.h"
 #include "model.h"
+#include <glm/gtc/matrix_access.hpp>
 
 const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red = TGAColor(255, 0, 0, 255);
@@ -13,7 +14,7 @@ const int width = 800;
 const int height = 800;
 const int depth = 255;
 
-glm::dvec3 camera(-2, 2, 5);
+glm::dvec3 camera(-2, 0, 5);
 glm::dvec3 light_dir(-1, 1, 1);
 glm::dvec3 cameraTarget(0, 0, 0);
 
@@ -45,6 +46,7 @@ struct GouraudShader : public IShader {
     glm::dvec3 varying_view;
     glm::dvec3 varying_uvCoords[3];
     glm::dvec3 varying_fragPos[3];
+    glm::dmat3 varying_normal;
     glm::dmat4 uniform_M;
     glm::dmat4 uniform_invM;
 
@@ -54,6 +56,7 @@ struct GouraudShader : public IShader {
 
     virtual glm::dvec3 vertex(int iface, int nthvert) override {
         varying_iface = iface;
+        varying_normal[nthvert] = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(model->normal(iface, nthvert), 0.0)));
         varying_uvCoords[nthvert] = model->vert_texture(model->vert_texture_idx(iface)[nthvert]);
         
         // rasterize
@@ -75,16 +78,35 @@ struct GouraudShader : public IShader {
 
     virtual bool fragment(glm::dvec3 baryCoord, TGAImage& tex_image, TGAImage& nm_image, TGAImage& spec_image, TGAColor& color) override {
         glm::dvec3 uv = varying_uvCoords[0] * baryCoord[0] + varying_uvCoords[1] * baryCoord[1] + varying_uvCoords[2] * baryCoord[2];
+        
         // normal from map
         TGAColor nm_color = nm_image.get((int)(uv[0] * nm_image.get_width()), (int)(uv[1] * nm_image.get_height()));
         glm::dvec3 norm;
         for (int i = 0; i < 3; i++) {
             norm[2 - i] = (double)nm_color[i] / 255.0 * 2.0 - 1.0;
         }
+        glm::dvec3 n_map = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(norm, 0.0)));
 
         // normal and light vector
         glm::dvec3 l = glm::normalize(glm::dvec3(uniform_M * glm::dvec4(light_dir, 0.0)));
-        glm::dvec3 n = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(norm, 0.0)));
+        glm::dvec3 bn = glm::normalize(varying_normal * baryCoord);
+
+        // darboux basis
+        glm::dmat3 mat_A;
+        mat_A[0] = varying_fragPos[1] - varying_fragPos[0];
+        mat_A[1] = varying_fragPos[2] - varying_fragPos[0];
+        mat_A[2] = bn;
+        mat_A = glm::transpose(mat_A);
+
+        glm::dmat3 mat_AInv = glm::inverse(mat_A);
+        glm::dvec3 i = -mat_AInv * glm::dvec3(varying_uvCoords[1][0] - varying_uvCoords[0][0], varying_uvCoords[2][0] - varying_uvCoords[0][0], 0.0);
+        glm::dvec3 j = -mat_AInv * glm::dvec3(varying_uvCoords[1][1] - varying_uvCoords[0][1], varying_uvCoords[2][1] - varying_uvCoords[0][1], 0.0);
+
+        glm::dmat3 mat_B;
+        mat_B[0] = glm::normalize(i);
+        mat_B[1] = glm::normalize(j);
+        mat_B[2] = bn;
+        glm::dvec3 n = glm::normalize(mat_B * n_map);
         
         // diffuse
         TGAColor tex_color = tex_image.get((int)(uv[0] * tex_image.get_width()), (int)(uv[1] * tex_image.get_height()));
@@ -127,7 +149,7 @@ int main(int argc, char** argv) {
     textureImage.flip_vertically();
 
     TGAImage normalImage;
-    normalImage.read_tga_file("obj/african_head_nm.tga");
+    normalImage.read_tga_file("obj/african_head_nm_tangent.tga");
     normalImage.flip_vertically();
 
     TGAImage specImage;
