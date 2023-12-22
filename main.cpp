@@ -42,9 +42,8 @@ void printDMat4(const glm::dmat4& mat) {
 }
 
 struct GouraudShader : public IShader {
-    int varying_iface;
     glm::dvec3 varying_view;
-    glm::dvec3 varying_uvCoords[3];
+    glm::dmat3 varying_uvCoords;
     glm::dvec3 varying_fragPos[3];
     glm::dmat3 varying_normal;
     glm::dmat4 uniform_M;
@@ -55,7 +54,6 @@ struct GouraudShader : public IShader {
     double kd = 0.6;
 
     virtual glm::dvec3 vertex(int iface, int nthvert) override {
-        varying_iface = iface;
         varying_normal[nthvert] = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(model->normal(iface, nthvert), 0.0)));
         varying_uvCoords[nthvert] = model->vert_texture(model->vert_texture_idx(iface)[nthvert]);
         
@@ -77,8 +75,8 @@ struct GouraudShader : public IShader {
     }
 
     virtual bool fragment(glm::dvec3 baryCoord, TGAImage& tex_image, TGAImage& nm_image, TGAImage& spec_image, TGAColor& color) override {
-        glm::dvec3 uv = varying_uvCoords[0] * baryCoord[0] + varying_uvCoords[1] * baryCoord[1] + varying_uvCoords[2] * baryCoord[2];
-        
+        glm::dvec3 uv = varying_uvCoords * baryCoord;
+
         // normal from map
         TGAColor nm_color = nm_image.get((int)(uv[0] * nm_image.get_width()), (int)(uv[1] * nm_image.get_height()));
         glm::dvec3 norm;
