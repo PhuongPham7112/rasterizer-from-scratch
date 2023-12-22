@@ -106,7 +106,7 @@ struct GouraudShader : public IShader {
         mat_B[0] = glm::normalize(i);
         mat_B[1] = glm::normalize(j);
         mat_B[2] = bn;
-        glm::dvec3 n = glm::normalize(mat_B * n_map);
+        glm::dvec3 n = n_map;
         
         // diffuse
         TGAColor tex_color = tex_image.get((int)(uv[0] * tex_image.get_width()), (int)(uv[1] * tex_image.get_height()));
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
     textureImage.flip_vertically();
 
     TGAImage normalImage;
-    normalImage.read_tga_file("obj/african_head_nm_tangent.tga");
+    normalImage.read_tga_file("obj/african_head_nm.tga");
     normalImage.flip_vertically();
 
     TGAImage specImage;
