@@ -53,6 +53,14 @@ Model::Model(const char *filename) : verts_(), faces_() {
         }
     }
     std::cerr << "# v# " << verts_.size() << " #vt " << verts_texture_.size() << " vertex texture idx " << verts_texture_idx_.size() << " f# " << faces_.size() << " vn# " << norms_.size() << std::endl;
+
+    load_texture(filename, "_diffuse.tga", diffusemap);
+    diffusemap.flip_vertically();
+    load_texture(filename, "_nm.tga", normalmap);
+    normalmap.flip_vertically();
+    load_texture(filename, "_spec.tga", specularmap);
+    specularmap.flip_vertically();
+
 }
 
 Model::~Model() {
@@ -99,5 +107,12 @@ glm::dvec3 Model::vert(int i) {
 
 glm::dvec3 Model::vert_texture(int i) {
     return verts_texture_[i];
+}
+
+void Model::load_texture(std::string filename, const std::string suffix, TGAImage& img) {
+    size_t dot = filename.find_last_of(".");
+    if (dot == std::string::npos) return;
+    std::string texfile = filename.substr(0, dot) + suffix;
+    std::cerr << "texture file " << texfile << " loading " << (img.read_tga_file(texfile.c_str()) ? "ok" : "failed") << std::endl;
 }
 

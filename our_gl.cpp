@@ -55,7 +55,7 @@ glm::dvec3 barycentric(glm::dvec3 A, glm::dvec3 B, glm::dvec3 C, glm::dvec3 P) {
     return glm::dvec3(1.0 - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
 }
 
-void triangle(glm::dvec3* pts, IShader& shader, TGAImage& image, TGAImage& tex_image, TGAImage& nm_image, TGAImage& spec_image, double* zbuffer) {
+void triangle(glm::dvec3* pts, IShader& shader, TGAImage& image, double* zbuffer) {
     glm::dvec2 bboxmin(std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
     glm::dvec2 bboxmax(std::numeric_limits<double>::min(), std::numeric_limits<double>::min());
     glm::dvec2 clamp(static_cast<double>(image.get_width() - 1), static_cast<double>(image.get_height() - 1));
@@ -74,7 +74,7 @@ void triangle(glm::dvec3* pts, IShader& shader, TGAImage& image, TGAImage& tex_i
 
             // calculate texture color
             TGAColor tex_color;
-            shader.fragment(bc_screen, tex_image, nm_image, spec_image, tex_color);
+            shader.fragment(bc_screen, tex_color);
 
             // hidden face removal
             P.z = 0.0;

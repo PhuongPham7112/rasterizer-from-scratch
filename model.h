@@ -4,6 +4,7 @@
 #include <vector>
 #include "geometry.h"
 #include <glm/glm.hpp>
+#include "tgaimage.h"
 
 class Model {
 private:
@@ -19,12 +20,16 @@ public:
 	int nverts();
 	int nfaces();
 	int nvertTex();
+	TGAImage diffusemap{};         // diffuse color texture
+	TGAImage normalmap{};          // normal map texture
+	TGAImage specularmap{};        // specular map texture
 	glm::dvec3 vert(int i);
 	glm::dvec3 vert_texture(int i);
 	glm::dvec3 normal(int iface);
 	glm::dvec3 normal(int iface, int nthvert);
 	std::vector<int> face(int idx);
 	std::vector<int> vert_texture_idx(int idx);
+	void load_texture(std::string filename, const std::string suffix, TGAImage& img);
 };
 
 #endif //__MODEL_H__

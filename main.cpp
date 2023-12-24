@@ -1,6 +1,7 @@
 #include <vector>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <limits>
 #include "our_gl.h"
 #include "tgaimage.h"
@@ -74,11 +75,11 @@ struct GouraudShader : public IShader {
         return result;
     }
 
-    virtual bool fragment(glm::dvec3 baryCoord, TGAImage& tex_image, TGAImage& nm_image, TGAImage& spec_image, TGAColor& color) override {
+    virtual bool fragment(glm::dvec3 baryCoord, TGAColor& color) override {
         glm::dvec3 uv = varying_uvCoords * baryCoord;
 
         // normal from map
-        TGAColor nm_color = nm_image.get((int)(uv[0] * nm_image.get_width()), (int)(uv[1] * nm_image.get_height()));
+        TGAColor nm_color = model->normalmap.get((int)(uv[0] * model->normalmap.get_width()), (int)(uv[1] * model->normalmap.get_height()));
         glm::dvec3 norm;
         for (int i = 0; i < 3; i++) {
             norm[2 - i] = (double)nm_color[i] / 255.0 * 2.0 - 1.0;
@@ -107,11 +108,11 @@ struct GouraudShader : public IShader {
         glm::dvec3 n = n_map;
         
         // diffuse
-        TGAColor tex_color = tex_image.get((int)(uv[0] * tex_image.get_width()), (int)(uv[1] * tex_image.get_height()));
+        TGAColor tex_color = model->diffusemap.get((int)(uv[0] * model->diffusemap.get_width()), (int)(uv[1] * model->diffusemap.get_height()));
         double diffuse_intensity = std::max(0.0, glm::dot(n, l));
 
         // specular
-        TGAColor spec_color = spec_image.get((int)(uv[0] * spec_image.get_width()), (int)(uv[1] * spec_image.get_height()));
+        TGAColor spec_color = model->specularmap.get((int)(uv[0] * model->specularmap.get_width()), (int)(uv[1] * model->specularmap.get_height()));
         glm::dvec3 reflection = glm::normalize(glm::reflect(l, n));
         double cos_angle = glm::max(glm::dot(reflection, varying_view), 0.0);
         double spec_intensity = glm::pow(cos_angle, 5.0 + spec_color[0]/1.0);
@@ -130,10 +131,12 @@ struct GouraudShader : public IShader {
 
 int main(int argc, char** argv) {
     if (2 == argc) {
-        model = new Model(argv[1]);
+        std::cout << argv[1] << std::endl;
+        model = new Model(strcat(argv[1], ".obj"));
     }
     else {
-        model = new Model("obj/african_head.obj");
+        std::cout << "Too few args" << std::endl;
+        return -1;
     }
 
     double* zbuffer = new double[(width * height)];
@@ -141,18 +144,6 @@ int main(int argc, char** argv) {
 
     TGAImage outImage(width, height, TGAImage::RGB);
     outImage.flip_vertically();
-
-    TGAImage textureImage; 
-    textureImage.read_tga_file("obj/african_head_diffuse.tga");
-    textureImage.flip_vertically();
-
-    TGAImage normalImage;
-    normalImage.read_tga_file("obj/african_head_nm.tga");
-    normalImage.flip_vertically();
-
-    TGAImage specImage;
-    specImage.read_tga_file("obj/african_head_spec.tga");
-    specImage.flip_vertically();
 
     // all transformation matrices
     glm::dvec3 cameraEye = glm::normalize(cameraTarget - camera);
@@ -170,7 +161,7 @@ int main(int argc, char** argv) {
         for (int j = 0; j < 3; j++) {
             pts[j] = shader.vertex(i, j);
         }
-        triangle(pts, shader, outImage, textureImage, normalImage, specImage, zbuffer);
+        triangle(pts, shader, outImage, zbuffer);
     }
 
     outImage.write_tga_file("output.tga");
