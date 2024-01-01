@@ -44,6 +44,7 @@ void printDMat4(const glm::dmat4& mat) {
     }
 }
 
+// shader for building shadow buffer
 struct DepthShader : public IShader {
     glm::dmat3 varying_tri;
 
@@ -73,6 +74,7 @@ struct DepthShader : public IShader {
     }
 };
 
+// shader with diffuse + specular + ambience
 struct GouraudShader : public IShader {
     glm::dvec3 varying_view;
     glm::dmat3 varying_uvCoords;
@@ -116,7 +118,7 @@ struct GouraudShader : public IShader {
         glm::dvec4 shadow_point = uniform_shadowM * glm::dvec4(varying_fragPos * baryCoord, 1.0); // corresponding point in the shadow buffer
         shadow_point = shadow_point / shadow_point[3];
         int idx = int(shadow_point[0]) + int(shadow_point[1]) * width; // index in the shadowbuffer array
-        double shadow = 0.3 + 0.7 * (shadow_buffer[idx] < shadow_point[2] + 43.34); // magic coeff to avoid z-fighting
+        double shadow = 0.3 + 0.7 * (shadow_buffer[idx] < shadow_point[2] + 43.34); // only render front pixels & magic coeff to avoid z-fighting
 
         // normal from map
         TGAColor nm_color = model->normalmap.get((int)(uv[0] * model->normalmap.get_width()), (int)(uv[1] * model->normalmap.get_height()));
@@ -222,7 +224,7 @@ int main(int argc, char** argv) {
 
         // populate face
         GouraudShader shader;
-        shader.uniform_shadowM = (shadow_model_view * glm::inverse(Viewport_mat * Projection_mat * ModelView_mat));
+        shader.uniform_shadowM = shadow_model_view * glm::inverse(Viewport_mat * Projection_mat * ModelView_mat); // screen space -> object space -> shadow screen space 
         shader.uniform_M = Projection_mat * ModelView_mat;
         shader.uniform_invM = glm::inverse(shader.uniform_M);
 
