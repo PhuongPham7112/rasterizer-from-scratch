@@ -16,9 +16,10 @@ const int width = 800;
 const int height = 800;
 const int depth = 255;
 
-glm::dvec3 camera(-2, 0, 5);
-glm::dvec3 light_dir(-1, 1, 1);
-glm::dvec3 cameraTarget(0, 0, 0);
+glm::dvec3 camera_pos(2, 2, 5);
+glm::dvec3 light_dir(1, 1, 1);
+glm::dvec3 light_pos(0, 1, 1);
+glm::dvec3 camera_eye(0, 0, 0);
 
 // printing
 void printDVec3(const glm::dvec3& vec) {
@@ -104,12 +105,14 @@ struct GouraudShader : public IShader {
 
         // variables
         varying_fragPos[nthvert] = result;
-        varying_view = glm::normalize(camera - varying_fragPos[nthvert]);
+        varying_view = glm::normalize(camera_pos - varying_fragPos[nthvert]);
         return result;
     }
 
     virtual bool fragment(glm::dvec3 baryCoord, TGAColor& color) override {
         glm::dvec3 uv = varying_uvCoords * baryCoord;
+
+        // shadow mapping
         glm::dvec4 shadow_point = uniform_shadowM * glm::dvec4(varying_fragPos * baryCoord, 1.0); // corresponding point in the shadow buffer
         shadow_point = shadow_point / shadow_point[3];
         int idx = int(shadow_point[0]) + int(shadow_point[1]) * width; // index in the shadowbuffer array
@@ -176,17 +179,21 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    // buffer
     double* zbuffer = new double[(width * height)];
     shadow_buffer = new double[(width * height)];
     for (int i = width * height; --i;) {
         zbuffer[i] = shadow_buffer[i] = -std::numeric_limits<float>::max();
     }
 
+    // lighting
+    light_dir = glm::normalize(light_pos - camera_eye);
+
     { 
         // rendering the shadow buffer
         TGAImage depthImage(width, height, TGAImage::RGB);
         depthImage.flip_vertically(); // to place the origin in the bottom left corner of the image
-        lookAt(glm::normalize(light_dir), camera, glm::dvec3(0.0, 1.0, 0.0)); // modelview matrix
+        lookAt(camera_eye, light_pos, glm::dvec3(0.0, 1.0, 0.0)); // modelview matrix
         viewport(static_cast<double>(width) / 8.0, static_cast<double>(height) / 8.0, static_cast<double>(width) * 0.75, static_cast<double>(height) * 0.75, depth);
         projection(0);
 
@@ -209,9 +216,9 @@ int main(int argc, char** argv) {
         outImage.flip_vertically();
 
         // all transformation matrices
-        projection(-1.0 / camera.z); // projection matrix
+        projection(-1.0 / camera_pos.z); // projection matrix
         viewport(static_cast<double>(width) / 8.0, static_cast<double>(height) / 8.0, static_cast<double>(width) * 0.75, static_cast<double>(height) * 0.75, depth); // viewport matrix
-        lookAt(glm::normalize(cameraTarget - camera), camera, glm::dvec3(0.0, 1.0, 0.0)); // modelview matrix
+        lookAt(camera_eye, camera_pos, glm::dvec3(0.0, 1.0, 0.0)); // modelview matrix
 
         // populate face
         GouraudShader shader;
