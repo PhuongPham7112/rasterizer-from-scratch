@@ -16,7 +16,7 @@ const int width = 800;
 const int height = 800;
 const int depth = 255;
 
-glm::dvec3 camera_pos(2, 2, 5);
+glm::dvec3 camera_pos(0, 2, 5);
 glm::dvec3 light_dir(1, 1, 1);
 glm::dvec3 light_pos(0, 1, 1);
 glm::dvec3 camera_eye(0, 0, 0);
@@ -116,7 +116,7 @@ struct GouraudShader : public IShader {
         glm::dvec4 shadow_point = uniform_shadowM * glm::dvec4(varying_fragPos * baryCoord, 1.0); // corresponding point in the shadow buffer
         shadow_point = shadow_point / shadow_point[3];
         int idx = int(shadow_point[0]) + int(shadow_point[1]) * width; // index in the shadowbuffer array
-        double shadow = 0.3 + 0.7 * (shadow_buffer[idx] < shadow_point[2]); // magic coeff to avoid z-fighting
+        double shadow = 0.3 + 0.7 * (shadow_buffer[idx] < shadow_point[2] + 43.34); // magic coeff to avoid z-fighting
 
         // normal from map
         TGAColor nm_color = model->normalmap.get((int)(uv[0] * model->normalmap.get_width()), (int)(uv[1] * model->normalmap.get_height()));
@@ -179,6 +179,9 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    // lighting
+    light_dir = glm::normalize(light_pos - camera_eye);
+
     // buffer
     double* zbuffer = new double[(width * height)];
     shadow_buffer = new double[(width * height)];
@@ -186,11 +189,8 @@ int main(int argc, char** argv) {
         zbuffer[i] = shadow_buffer[i] = -std::numeric_limits<float>::max();
     }
 
-    // lighting
-    light_dir = glm::normalize(light_pos - camera_eye);
-
+    // rendering the shadow buffer
     { 
-        // rendering the shadow buffer
         TGAImage depthImage(width, height, TGAImage::RGB);
         depthImage.flip_vertically(); // to place the origin in the bottom left corner of the image
         lookAt(camera_eye, light_pos, glm::dvec3(0.0, 1.0, 0.0)); // modelview matrix
@@ -210,8 +210,8 @@ int main(int argc, char** argv) {
     
     glm::dmat4 shadow_model_view = Viewport_mat * Projection_mat * ModelView_mat;
 
+    // main image rendering
     {
-        // main image rendering
         TGAImage outImage(width, height, TGAImage::RGB);
         outImage.flip_vertically();
 
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
 
         // populate face
         GouraudShader shader;
-        shader.uniform_shadowM = glm::inverse(shadow_model_view * (Viewport_mat * Projection_mat * ModelView_mat));
+        shader.uniform_shadowM = (shadow_model_view * glm::inverse(Viewport_mat * Projection_mat * ModelView_mat));
         shader.uniform_M = Projection_mat * ModelView_mat;
         shader.uniform_invM = glm::inverse(shader.uniform_M);
 
