@@ -11,6 +11,7 @@
 const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red = TGAColor(255, 0, 0, 255);
 Model* model = NULL;
+double* shadow_buffer = NULL;
 const int width = 800;
 const int height = 800;
 const int depth = 255;
@@ -42,17 +43,49 @@ void printDMat4(const glm::dmat4& mat) {
     }
 }
 
+struct DepthShader : public IShader {
+    glm::dmat3 varying_tri;
+
+    DepthShader() : varying_tri() {}
+
+    virtual glm::dvec3 vertex(int iface, int nthvert) {
+        // rasterize
+        glm::dvec3 v = model->vert(model->face(iface)[nthvert]);
+        glm::dvec4 aug_coords(v.x, v.y, v.z, 1.0);
+        glm::dvec4 aug_mat = Viewport_mat * Projection_mat * ModelView_mat * aug_coords;
+
+        // make smoother result
+        glm::dvec3 result;
+        result.x = int(aug_mat[0] / aug_mat[3]);
+        result.y = int(aug_mat[1] / aug_mat[3]);
+        result.z = aug_mat[2] / aug_mat[3];
+
+        varying_tri[nthvert] = result;
+             
+        return result;
+    }
+
+    virtual bool fragment(glm::dvec3 bar, TGAColor& color) {
+        glm::dvec3 p = varying_tri * bar;
+        color = TGAColor(255, 255, 255) * (p.z / depth);
+        return false;
+    }
+};
+
 struct GouraudShader : public IShader {
     glm::dvec3 varying_view;
     glm::dmat3 varying_uvCoords;
-    glm::dvec3 varying_fragPos[3];
+    glm::dmat3 varying_fragPos;
     glm::dmat3 varying_normal;
     glm::dmat4 uniform_M;
     glm::dmat4 uniform_invM;
+    glm::dmat4 uniform_shadowM; // transform framebuffer screen coordinates to shadowbuffer screen coordinates
 
     double ks = 0.4;
     double ka = 0.1;
     double kd = 0.6;
+
+    GouraudShader() {}
 
     virtual glm::dvec3 vertex(int iface, int nthvert) override {
         varying_normal[nthvert] = glm::normalize(glm::dvec3(uniform_invM * glm::dvec4(model->normal(iface, nthvert), 0.0)));
@@ -77,6 +110,10 @@ struct GouraudShader : public IShader {
 
     virtual bool fragment(glm::dvec3 baryCoord, TGAColor& color) override {
         glm::dvec3 uv = varying_uvCoords * baryCoord;
+        glm::dvec4 shadow_point = uniform_shadowM * glm::dvec4(varying_fragPos * baryCoord, 1.0); // corresponding point in the shadow buffer
+        shadow_point = shadow_point / shadow_point[3];
+        int idx = int(shadow_point[0]) + int(shadow_point[1]) * width; // index in the shadowbuffer array
+        double shadow = 0.3 + 0.7 * (shadow_buffer[idx] < shadow_point[2]); // magic coeff to avoid z-fighting
 
         // normal from map
         TGAColor nm_color = model->normalmap.get((int)(uv[0] * model->normalmap.get_width()), (int)(uv[1] * model->normalmap.get_height()));
@@ -123,7 +160,7 @@ struct GouraudShader : public IShader {
 
         // clamp each color
         for (int i = 0; i < 3; i++) {
-            color[i] = std::min<double>(tex_color[i] * (ka * ambient_intensity + ks * spec_intensity + kd * diffuse_intensity), 255.0);
+            color[i] = std::min<double>(tex_color[i] * shadow * (ka * ambient_intensity + ks * spec_intensity + kd * diffuse_intensity), 255.0);
         }
         return false;
     }
@@ -140,33 +177,61 @@ int main(int argc, char** argv) {
     }
 
     double* zbuffer = new double[(width * height)];
-    for (int i = (width * height); i--; zbuffer[i] = std::numeric_limits<double>::min());
-
-    TGAImage outImage(width, height, TGAImage::RGB);
-    outImage.flip_vertically();
-
-    // all transformation matrices
-    glm::dvec3 cameraEye = glm::normalize(cameraTarget - camera);
-    projection(camera.z); // projection matrix
-    viewport(static_cast<double>(width) / 8.0, static_cast<double>(height) / 8.0, static_cast<double>(width) * 0.75, static_cast<double>(height) * 0.75, depth); // viewport matrix
-    lookAt(cameraEye, camera, glm::dvec3(0.0, 1.0, 0.0)); // modelview matrix
-
-    // populate face
-    GouraudShader shader;
-    shader.uniform_M = Projection_mat * ModelView_mat;
-    shader.uniform_invM = glm::inverse(shader.uniform_M);
-
-    for (int i = 0; i < model->nfaces(); i++) {
-        glm::dvec3 pts[3];
-        for (int j = 0; j < 3; j++) {
-            pts[j] = shader.vertex(i, j);
-        }
-        triangle(pts, shader, outImage, zbuffer);
+    shadow_buffer = new double[(width * height)];
+    for (int i = width * height; --i;) {
+        zbuffer[i] = shadow_buffer[i] = -std::numeric_limits<float>::max();
     }
 
-    outImage.write_tga_file("output.tga");
+    { 
+        // rendering the shadow buffer
+        TGAImage depthImage(width, height, TGAImage::RGB);
+        depthImage.flip_vertically(); // to place the origin in the bottom left corner of the image
+        lookAt(glm::normalize(light_dir), camera, glm::dvec3(0.0, 1.0, 0.0)); // modelview matrix
+        viewport(static_cast<double>(width) / 8.0, static_cast<double>(height) / 8.0, static_cast<double>(width) * 0.75, static_cast<double>(height) * 0.75, depth);
+        projection(0);
+
+        DepthShader depthshader;
+        for (int i = 0; i < model->nfaces(); i++) {
+            glm::dvec3 pts[3];
+            for (int j = 0; j < 3; j++) {
+                pts[j] = depthshader.vertex(i, j);
+            }
+            triangle(pts, depthshader, depthImage, shadow_buffer);
+        }
+        depthImage.write_tga_file("depth.tga");
+    }
+    
+    glm::dmat4 shadow_model_view = Viewport_mat * Projection_mat * ModelView_mat;
+
+    {
+        // main image rendering
+        TGAImage outImage(width, height, TGAImage::RGB);
+        outImage.flip_vertically();
+
+        // all transformation matrices
+        projection(-1.0 / camera.z); // projection matrix
+        viewport(static_cast<double>(width) / 8.0, static_cast<double>(height) / 8.0, static_cast<double>(width) * 0.75, static_cast<double>(height) * 0.75, depth); // viewport matrix
+        lookAt(glm::normalize(cameraTarget - camera), camera, glm::dvec3(0.0, 1.0, 0.0)); // modelview matrix
+
+        // populate face
+        GouraudShader shader;
+        shader.uniform_shadowM = glm::inverse(shadow_model_view * (Viewport_mat * Projection_mat * ModelView_mat));
+        shader.uniform_M = Projection_mat * ModelView_mat;
+        shader.uniform_invM = glm::inverse(shader.uniform_M);
+
+        for (int i = 0; i < model->nfaces(); i++) {
+            glm::dvec3 pts[3];
+            for (int j = 0; j < 3; j++) {
+                pts[j] = shader.vertex(i, j);
+            }
+            triangle(pts, shader, outImage, zbuffer);
+        }
+
+        outImage.write_tga_file("output.tga");
+    }
 
     delete model;
     delete[] zbuffer;
+    delete[] shadow_buffer;
     return 0;
 }

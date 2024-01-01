@@ -35,9 +35,9 @@ void lookAt(glm::dvec3 eye, glm::dvec3 center, glm::dvec3 up) {
     ModelView_mat = M_inv * Tr;
 }
 
-void projection(double cameraZ) {
+void projection(double coeff) {
     Projection_mat = glm::dmat4(1.0);
-    Projection_mat[2][3] = -1.0 / (cameraZ);
+    Projection_mat[2][3] = coeff; //-1.0 / (cameraZ);
 }
 
 glm::dvec3 barycentric(glm::dvec3 A, glm::dvec3 B, glm::dvec3 C, glm::dvec3 P) {
