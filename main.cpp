@@ -12,7 +12,6 @@ const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red = TGAColor(255, 0, 0, 255);
 Model* model = NULL;
 double* shadow_buffer = NULL;
-double* glow_buffer = NULL;
 const int width = 800;
 const int height = 800;
 const int depth = 255;
@@ -23,7 +22,9 @@ const double ka = 0.1;
 const double kd = 0.6;
 const double ke = 5.0;
 const double gamma = 1.25;
+const double bloom_threshold = 0.75;
 
+// scene var
 glm::dvec3 camera_pos(0, 0, 5);
 glm::dvec3 light_dir(1, 1, 1);
 glm::dvec3 light_pos(0, 1, 1);
@@ -165,6 +166,11 @@ struct GouraudShader : public IShader {
 
         // emission = glow
         TGAColor glow_color = model->glowmap.get((int)(uv[0] * model->glowmap.get_width()), (int)(uv[1] * model->glowmap.get_height()));
+        double glow_intensity = 0.0;
+        double luminance = 0.2126 * glow_color[0] + 0.7152 * glow_color[1] + 0.0722 * glow_color[2];
+        if (luminance > bloom_threshold) {
+            glow_intensity = 1.0;
+        }
 
         // ambient
         double ambient_intensity = 1.0;
@@ -172,7 +178,7 @@ struct GouraudShader : public IShader {
         // calculate diffuse + specular + emission + ambient
         glm::dvec3 final_color = glm::dvec3(color[0], color[1], color[2]);
         for (int i = 0; i < 3; i++) {
-            double col_i = (diffuse_color[i] * shadow * (ka * ambient_intensity + ks * spec_intensity + kd * diffuse_intensity) + glow_color[i] * ke);
+            double col_i = (diffuse_color[i] * shadow * (ka * ambient_intensity + ks * spec_intensity + kd * diffuse_intensity) + glow_color[i] * ke * glow_intensity);
             final_color[i] = std::min<double>(col_i, 255.0);
         }
 
@@ -201,13 +207,11 @@ int main(int argc, char** argv) {
     // buffer
     double* zbuffer = new double[(width * height)];
     shadow_buffer = new double[(width * height)];
-    glow_buffer = new double[(width * height)];
     for (int i = width * height; --i;) {
         zbuffer[i] = shadow_buffer[i] = -std::numeric_limits<float>::max();
-        glow_buffer[i] = 0.0;
     }
 
-    // rendering the shadow buffer
+    // building and rendering the shadow buffer
     { 
         TGAImage depthImage(width, height, TGAImage::RGB);
         depthImage.flip_vertically(); // to place the origin in the bottom left corner of the image
@@ -258,6 +262,5 @@ int main(int argc, char** argv) {
     delete model;
     delete[] zbuffer;
     delete[] shadow_buffer;
-    delete[] glow_buffer;
     return 0;
 }
