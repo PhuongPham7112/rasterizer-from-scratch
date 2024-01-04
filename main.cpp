@@ -12,11 +12,19 @@ const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red = TGAColor(255, 0, 0, 255);
 Model* model = NULL;
 double* shadow_buffer = NULL;
+double* glow_buffer = NULL;
 const int width = 800;
 const int height = 800;
 const int depth = 255;
 
-glm::dvec3 camera_pos(0, 2, 5);
+// shader var
+const double ks = 1.0;
+const double ka = 0.1;
+const double kd = 0.6;
+const double ke = 5.0;
+const double gamma = 1.25;
+
+glm::dvec3 camera_pos(0, 0, 5);
 glm::dvec3 light_dir(1, 1, 1);
 glm::dvec3 light_pos(0, 1, 1);
 glm::dvec3 camera_eye(0, 0, 0);
@@ -84,10 +92,6 @@ struct GouraudShader : public IShader {
     glm::dmat4 uniform_invM;
     glm::dmat4 uniform_shadowM; // transform framebuffer screen coordinates to shadowbuffer screen coordinates
 
-    double ks = 0.4;
-    double ka = 0.1;
-    double kd = 0.6;
-
     GouraudShader() {}
 
     virtual glm::dvec3 vertex(int iface, int nthvert) override {
@@ -150,7 +154,7 @@ struct GouraudShader : public IShader {
         glm::dvec3 n = n_map;
         
         // diffuse
-        TGAColor tex_color = model->diffusemap.get((int)(uv[0] * model->diffusemap.get_width()), (int)(uv[1] * model->diffusemap.get_height()));
+        TGAColor diffuse_color = model->diffusemap.get((int)(uv[0] * model->diffusemap.get_width()), (int)(uv[1] * model->diffusemap.get_height()));
         double diffuse_intensity = std::max(0.0, glm::dot(n, l));
 
         // specular
@@ -159,13 +163,23 @@ struct GouraudShader : public IShader {
         double cos_angle = glm::max(glm::dot(reflection, varying_view), 0.0);
         double spec_intensity = glm::pow(cos_angle, 5.0 + spec_color[0]/1.0);
 
-        // final color
-        double ambient_intensity = 1.0;
-        color = tex_color;
+        // emission = glow
+        TGAColor glow_color = model->glowmap.get((int)(uv[0] * model->glowmap.get_width()), (int)(uv[1] * model->glowmap.get_height()));
 
-        // clamp each color
+        // ambient
+        double ambient_intensity = 1.0;
+
+        // calculate diffuse + specular + emission + ambient
+        glm::dvec3 final_color = glm::dvec3(color[0], color[1], color[2]);
         for (int i = 0; i < 3; i++) {
-            color[i] = std::min<double>(tex_color[i] * shadow * (ka * ambient_intensity + ks * spec_intensity + kd * diffuse_intensity), 255.0);
+            double col_i = (diffuse_color[i] * shadow * (ka * ambient_intensity + ks * spec_intensity + kd * diffuse_intensity) + glow_color[i] * ke);
+            final_color[i] = std::min<double>(col_i, 255.0);
+        }
+
+        // gamma corrected final color
+        final_color = 255.0 * glm::pow(final_color / 255.0, glm::dvec3(1.0 / gamma));
+        for (int i = 0; i < 3; i++) {
+            color[i] = final_color[i];
         }
         return false;
     }
@@ -187,8 +201,10 @@ int main(int argc, char** argv) {
     // buffer
     double* zbuffer = new double[(width * height)];
     shadow_buffer = new double[(width * height)];
+    glow_buffer = new double[(width * height)];
     for (int i = width * height; --i;) {
         zbuffer[i] = shadow_buffer[i] = -std::numeric_limits<float>::max();
+        glow_buffer[i] = 0.0;
     }
 
     // rendering the shadow buffer
@@ -242,5 +258,6 @@ int main(int argc, char** argv) {
     delete model;
     delete[] zbuffer;
     delete[] shadow_buffer;
+    delete[] glow_buffer;
     return 0;
 }

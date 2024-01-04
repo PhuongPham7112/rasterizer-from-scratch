@@ -60,6 +60,8 @@ Model::Model(const char *filename) : verts_(), faces_() {
     normalmap.flip_vertically();
     load_texture(filename, "_spec.tga", specularmap);
     specularmap.flip_vertically();
+    load_texture(filename, "_glow.tga", glowmap);
+    glowmap.flip_vertically();
 
 }
 

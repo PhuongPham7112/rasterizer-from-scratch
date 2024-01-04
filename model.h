@@ -23,6 +23,7 @@ public:
 	TGAImage diffusemap{};         // diffuse color texture
 	TGAImage normalmap{};          // normal map texture
 	TGAImage specularmap{};        // specular map texture
+	TGAImage glowmap{};        // specular map texture
 	glm::dvec3 vert(int i);
 	glm::dvec3 vert_texture(int i);
 	glm::dvec3 normal(int iface);
