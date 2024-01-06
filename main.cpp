@@ -17,7 +17,7 @@ const int height = 800;
 const int depth = 255;
 
 // shader var
-const double ks = 1.0;
+const double ks = 0.2;
 const double ka = 0.1;
 const double kd = 0.6;
 const double ke = 5.0;
@@ -25,7 +25,7 @@ const double gamma = 1.25;
 const double bloom_threshold = 0.75;
 
 // scene var
-glm::dvec3 camera_pos(0, 0, 5);
+glm::dvec3 camera_pos(2, 2, 5);
 glm::dvec3 light_dir(1, 1, 1);
 glm::dvec3 light_pos(0, 1, 1);
 glm::dvec3 camera_eye(0, 0, 0);
